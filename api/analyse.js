@@ -1,3 +1,4 @@
+
 export const config = { maxDuration: 30 };
 
 export default async function handler(req, res) {
@@ -11,8 +12,8 @@ export default async function handler(req, res) {
   const { username } = req.body || {};
   if (!username) return res.status(400).json({ error: 'Username is required' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Server not configured. Add ANTHROPIC_API_KEY to Vercel environment variables.' });
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Server not configured.' });
 
   const SIDE_HUSTLES = [
     "Ghostwriting","Newsletter","Consulting","Digital Products","Coaching",
@@ -25,66 +26,56 @@ export default async function handler(req, res) {
     "AI Art Selling","App Development","Chrome Extensions","SaaS Products"
   ];
 
-  const prompt = `You are an expert career consultant and social media analyst.
+  const prompt = `You are an expert career consultant. Based on the X (Twitter) username @${username}, search your knowledge for anything you know about this person's online presence, content, and personality.
 
-Your task: Analyse the X (Twitter) profile @${username} and recommend side hustles.
+If you know who they are, use that. If you don't recognise them, make reasonable assumptions based on the username itself.
 
-STEP 1 — USE WEB SEARCH:
-- Search for "@${username} twitter" or "@${username} X profile" to find their current public profile.
-- Extract their REAL display name (often different from the handle).
-- Find their profile image URL (usually from pbs.twimg.com). If not found, return empty string.
-- Read their bio and recent tweets to understand their personality, skills, and interests.
+Pick 3 side hustles from this list that would fit them: ${SIDE_HUSTLES.join(', ')}
 
-STEP 2 — ANALYSE & MATCH:
-- Pick 3 side hustles from this list that best fit them: ${SIDE_HUSTLES.join(', ')}
-- Assign a 1-word VIBE (e.g. ELITE, CREATIVE, TECHY, HUSTLER, VISIONARY, BUILDER).
+Assign a 1-word VIBE (e.g. ELITE, CREATIVE, TECHY, HUSTLER, VISIONARY, BUILDER).
 
-STEP 3 — OUTPUT:
 Return ONLY valid JSON, no markdown, no explanation:
 {
-  "displayName": "Their real display name",
+  "displayName": "Their name or @${username} if unknown",
   "handle": "${username}",
-  "profileImageUrl": "https://pbs.twimg.com/... or empty string",
+  "profileImageUrl": "",
   "vibe": "ONE_WORD",
   "sideHustles": [
     {
       "title": "Hustle name from the list",
-      "whyItFits": "Max 15 words — specific reason based on their actual content",
-      "firstStep": "Max 10 words — concrete first action to start"
+      "whyItFits": "Max 15 words specific reason",
+      "firstStep": "Max 10 words concrete first action"
     }
   ]
 }`;
 
   try {
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://xsidehustle.vercel.app',
+        'X-Title': 'X Side Hustle Finder'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }]
+        model: 'meta-llama/llama-3.3-70b-instruct:free',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000
       })
     });
 
-    const data = await anthropicRes.json();
+    const data = await response.json();
 
-    if (!anthropicRes.ok) {
-      return res.status(anthropicRes.status).json({ error: data.error?.message || 'Anthropic API error' });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.error?.message || 'API error' });
     }
 
-    const textBlock = data.content?.find(b => b.type === 'text');
-    if (!textBlock?.text) return res.status(500).json({ error: 'No response from Claude' });
-
-    let raw = textBlock.text.trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    let raw = data.choices?.[0]?.message?.content?.trim() || '';
+    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return res.status(500).json({ error: 'Could not parse Claude response' });
+    if (!jsonMatch) return res.status(500).json({ error: 'Could not parse response. Try again.' });
 
     return res.status(200).json(JSON.parse(jsonMatch[0]));
   } catch (err) {
