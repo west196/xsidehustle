@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta property="og:title" content="Find your side hustle from your X profile" />
+<meta property="og:description" content="Enter your X username. AI analyses your profile and tells you what side hustle fits you." />
+<title>X Side Hustle Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #1d9bf0; --blue-dim: rgba(29,155,240,0.08); --blue-border: rgba(29,155,240,0.25);
+    --bg: #050505; --bg1: #0e0e0e; --bg2: #141414;
+    --border: #1f1f1f; --border2: #2a2a2a;
+    --text: #f0f0f0; --text2: #888; --text3: #444;
+    --mono: 'Space Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 2.5rem 1.25rem 4rem; }
+  body::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px); pointer-events: none; z-index: 0; }
+  .wrap { position: relative; z-index: 1; width: 100%; max-width: 500px; }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+  .x-logo { display: inline-block; width: 26px; height: 26px; margin-bottom: 1.2rem; opacity: 0.45; }
+  .eyebrow { font-family: var(--mono); font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+  h1 { font-family: var(--sans); font-size: clamp(26px, 6vw, 36px); font-weight: 800; line-height: 1.1; color: #fff; margin-bottom: 10px; }
+  h1 em { color: var(--blue); font-style: normal; }
+  .tagline { font-size: 13px; color: var(--text3); }
+
+  .input-card { background: var(--bg1); border: 1px solid var(--border); border-radius: 14px; padding: 1.4rem; margin-bottom: 1rem; }
+  .section-label { font-family: var(--mono); font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .handle-row { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 0 14px; transition: border-color 0.2s; }
+  .handle-row:focus-within { border-color: var(--blue-border); }
+  .at { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--blue); user-select: none; padding: 13px 0; }
+  input[type="text"] { flex: 1; background: transparent; border: none; outline: none; font-family: var(--mono); font-size: 15px; color: #fff; padding: 13px 0; }
+  input::placeholder { color: var(--text3); }
+
+  .analyse-btn { width: 100%; background: var(--blue); border: none; border-radius: 11px; padding: 14px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #fff; cursor: pointer; transition: background 0.2s, transform 0.1s, opacity 0.2s; text-transform: uppercase; }
+  .analyse-btn:hover:not(:disabled) { background: #1a8cd8; }
+  .analyse-btn:active:not(:disabled) { transform: scale(0.98); }
+  .analyse-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  #loading { display: none; text-align: center; padding: 4rem 1rem; }
+  #loading.show { display: block; }
+  .spinner-ring { display: inline-block; width: 34px; height: 34px; border: 2px solid var(--border2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.75s linear infinite; margin-bottom: 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 3px; text-transform: uppercase; }
+
+  #result { display: none; }
+  #result.show { display: block; animation: rise 0.4s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+
+  .profile-strip { display: flex; align-items: center; gap: 14px; background: var(--bg1); border: 1px solid var(--blue-border); border-radius: 14px; padding: 14px 18px; margin-bottom: 1rem; }
+  .avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 1px solid var(--blue-border); background: var(--bg2); flex-shrink: 0; }
+  .avatar-fallback { width: 48px; height: 48px; border-radius: 50%; background: var(--blue-dim); border: 1px solid var(--blue-border); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--blue); flex-shrink: 0; }
+  .profile-info { flex: 1; min-width: 0; }
+  .display-name { font-size: 15px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-handle { font-family: var(--mono); font-size: 11px; color: var(--blue); margin-top: 2px; }
+  .vibe-pill { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 2px; background: var(--blue-dim); border: 1px solid var(--blue-border); color: var(--blue); padding: 4px 10px; border-radius: 20px; }
+
+  .hustles { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+  .hustle-card { background: var(--bg1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
+  .hustle-card.top { border-color: var(--blue-border); background: linear-gradient(135deg, #0d1f2d 0%, #080808 100%); }
+  .hustle-card.top::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .hustle-title { font-size: 16px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .hustle-card.top .hustle-title { font-size: 18px; }
+  .rank-chip { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .hustle-card.top .rank-chip { background: var(--blue-dim); border: 1px solid var(--blue-border); color: var(--blue); }
+  .hustle-card:not(.top) .rank-chip { background: transparent; border: 1px solid var(--border2); color: var(--text3); }
+  .why-text { font-size: 13px; color: var(--text2); line-height: 1.55; margin-bottom: 10px; }
+  .hustle-card.top .why-text { color: #aaa; }
+  .first-step { display: flex; align-items: flex-start; gap: 8px; background: var(--bg2); border-radius: 8px; padding: 8px 12px; }
+  .step-label { font-family: var(--mono); font-size: 8px; letter-spacing: 2px; color: var(--blue); text-transform: uppercase; white-space: nowrap; padding-top: 2px; }
+  .step-text { font-size: 12px; color: var(--text2); line-height: 1.4; }
+
+  .share-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .share-btn { flex: 1; background: var(--blue); border: none; border-radius: 10px; padding: 13px; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #fff; cursor: pointer; transition: background 0.2s, transform 0.1s; text-transform: uppercase; }
+  .share-btn:hover { background: #1a8cd8; }
+  .share-btn:active { transform: scale(0.98); }
+  .reset-btn { background: transparent; border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-family: var(--mono); font-size: 10px; color: var(--text3); cursor: pointer; transition: all 0.2s; white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; }
+  .reset-btn:hover { border-color: var(--border2); color: var(--text2); }
+
+  .download-btn { width: 100%; background: transparent; border: 1px solid var(--border2); border-radius: 10px; padding: 12px; font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--text3); cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .download-btn:hover { border-color: var(--blue-border); color: var(--blue); }
+  .download-btn:active { transform: scale(0.98); }
+
+  .error { display: none; font-family: var(--mono); font-size: 11px; color: #e74c3c; background: #1a0808; border: 1px solid #3d1212; border-radius: 10px; padding: 12px 14px; margin-top: 10px; line-height: 1.6; }
+  .error.show { display: block; }
+
+  footer { margin-top: 2.5rem; text-align: center; font-family: var(--mono); font-size: 9px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="x-logo" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+    <div class="eyebrow">AI-powered tool</div>
+    <h1>Find your <em>side hustle</em><br/>from your X profile.</h1>
+    <p class="tagline">Enter your username. Claude analyses your profile. Get matched.</p>
+  </header>
+
+  <div id="input-section">
+    <div class="input-card">
+      <div class="section-label">Your X / Twitter Username</div>
+      <div class="handle-row">
+        <span class="at">@</span>
+        <input type="text" id="username" placeholder="yourhandle" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <button class="analyse-btn" id="analyse-btn" onclick="analyse()">ANALYSE MY PROFILE →</button>
+    <div class="error" id="error"></div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner-ring"></div>
+    <div class="load-label" id="load-text">SEARCHING PROFILE...</div>
+  </div>
+
+  <div id="result"></div>
+
+  <footer>Powered by Claude AI &nbsp;·&nbsp; No data stored</footer>
+</div>
+
+<script>
+const loadSteps = ["SEARCHING X PROFILE...","READING THE VIBES...","MATCHING HUSTLES...","CRAFTING YOUR RESULT..."];
+let loadTimer;
+
+function showLoad() {
+  let i = 0;
+  document.getElementById('load-text').textContent = loadSteps[0];
+  loadTimer = setInterval(() => { i = (i+1)%loadSteps.length; document.getElementById('load-text').textContent = loadSteps[i]; }, 1200);
+}
+function hideLoad() { clearInterval(loadTimer); }
+function showError(msg) { const el = document.getElementById('error'); el.textContent = msg; el.classList.add('show'); }
+function hideError() { document.getElementById('error').classList.remove('show'); }
+
+async function analyse() {
+  const username = document.getElementById('username').value.trim().replace(/^@/, '');
+  hideError();
+  if (!username) return showError('ERR: Enter an X/Twitter username to analyse.');
+
+  document.getElementById('input-section').style.display = 'none';
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('analyse-btn').disabled = true;
+  showLoad();
+
+  try {
+    const res = await fetch('/api/analyse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username })
+    });
+    const data = await res.json();
+    hideLoad();
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    renderResult(data);
+  } catch (err) {
+    hideLoad();
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('input-section').style.display = 'block';
+    document.getElementById('analyse-btn').disabled = false;
+    showError('ERR: ' + (err.message || 'Something went wrong. Try again.'));
+  }
+}
+
+function renderResult(d) {
+  document.getElementById('loading').classList.remove('show');
+  const handle = d.handle || document.getElementById('username').value.trim().replace(/^@/, '');
+  const initials = (d.displayName || handle).slice(0, 2).toUpperCase();
+
+  const avatarHtml = d.profileImageUrl
+    ? `<img class="avatar-img" src="${d.profileImageUrl}" alt="${escHtml(d.displayName)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="avatar-fallback" style="display:none">${initials}</div>`
+    : `<div class="avatar-fallback">${initials}</div>`;
+
+  const hustlesHtml = (d.sideHustles || []).map((h, i) => `
+    <div class="hustle-card ${i===0?'top':''}">
+      <div class="card-header">
+        <div class="hustle-title">${escHtml(h.title)}</div>
+        <div class="rank-chip">${i===0?'★ TOP MATCH':'#'+(i+1)+' MATCH'}</div>
+      </div>
+      <p class="why-text">${escHtml(h.whyItFits)}</p>
+      <div class="first-step">
+        <span class="step-label">First step</span>
+        <span class="step-text">${escHtml(h.firstStep)}</span>
+      </div>
+    </div>`).join('');
+
+  const topHustle = d.sideHustles?.[0]?.title || 'a great side hustle';
+  const shareText = `I just found my perfect side hustle from my X profile 🚀\n\n#1 match: ${topHustle}\nVibe: ${d.vibe || ''}\n\nFind yours → ${window.location.href}`;
+
+  document.getElementById('result').innerHTML = `
+    <div id="result-card">
+      <div class="profile-strip">
+        ${avatarHtml}
+        <div class="profile-info">
+          <div class="display-name">${escHtml(d.displayName || '@'+handle)}</div>
+          <div class="profile-handle">@${escHtml(handle)}</div>
+        </div>
+        ${d.vibe ? `<div class="vibe-pill">${escHtml(d.vibe)}</div>` : ''}
+      </div>
+      <div class="hustles">${hustlesHtml}</div>
+    </div>
+    <div class="share-row">
+      <button class="share-btn" id="share-btn">COPY & SHARE ON X ↗</button>
+      <button class="reset-btn" onclick="reset()">← REDO</button>
+    </div>
+    <button class="download-btn" id="download-btn">↓ DOWNLOAD RESULT AS IMAGE</button>
+  `;
+
+  document.getElementById('share-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(shareText).then(() => {
+      const btn = document.getElementById('share-btn');
+      btn.textContent = 'COPIED! ✓';
+      setTimeout(() => btn.textContent = 'COPY & SHARE ON X ↗', 2000);
+    });
+  });
+
+  document.getElementById('download-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('download-btn');
+    btn.textContent = 'GENERATING...';
+    btn.disabled = true;
+    try {
+      const card = document.getElementById('result-card');
+      const canvas = await html2canvas(card, {
+        backgroundColor: '#050505',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      const link = document.createElement('a');
+      link.download = `${handle}-side-hustle.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch(e) {
+      alert('Download failed. Try a screenshot instead.');
+    }
+    btn.textContent = '↓ DOWNLOAD RESULT AS IMAGE';
+    btn.disabled = false;
+  });
+
+  document.getElementById('result').classList.add('show');
+}
+
+function escHtml(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function reset() {
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('input-section').style.display = 'block';
+  document.getElementById('analyse-btn').disabled = false;
+  hideError();
+}
+
+document.getElementById('username').addEventListener('keydown', e => { if (e.key==='Enter') analyse(); });
+</script>
+</body>
+</html>
